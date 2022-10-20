@@ -15,6 +15,40 @@ cur_dir = os.path.dirname(os.path.realpath(__file__))
 from s2vgraph import S2VGraph
 import multiprocessing as mp
 from itertools import islice
+import torch
+
+def getSecretKey(origLockedFile):
+    with open(origLockedFile,'r') as f:
+        lines = f.readlines()
+    keyLine = lines[0] # Can be dangerous if the secret key is not dumped in first line
+    return keyLine
+
+def seed_everything(seed=566):                                                 
+    random.seed(seed)
+    #torch.seed(seed)
+    #torch.use_deterministic_algorithms(True)                                                 
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)                                                   
+        torch.cuda.manual_seed_all(seed)                                             
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+def sanityCheckPath(path,message=None):
+    if not osp.exists(path):
+        if message == None:
+            print(path+" . This path doesn't exist.")
+        else:
+            print(message)
+        exit(1)
+
+def line_prepender(filename, keyContent):
+    with open(filename, 'r+') as f:
+        content = f.read()
+        f.seek(0, 0)
+        f.write(keyContent.rstrip('\r\n') + '\n' + content)
 
 def keygates2subgraphs(A,B, train_pos, train_neg, test_pos, test_neg, val_pos,val_neg, h=2, node_information=None, no_parallel=False, DE_FLAG=True):
     def helper(A,B, links, g_label, DE_FLAG=True):
