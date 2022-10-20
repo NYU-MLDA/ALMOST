@@ -12,7 +12,7 @@ from gensim.models import Word2Vec
 import warnings
 warnings.simplefilter('ignore', ssp.SparseEfficiencyWarning)
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-from util import S2VGraph
+from s2vgraph import S2VGraph
 import multiprocessing as mp
 from itertools import islice
 
@@ -196,6 +196,3 @@ def subtract_list(first_list,second_list):
     resulting_list = []#list(first_list)
     resulting_list.extend(x for x in first_list if x not in second_list)
     return resulting_list
-
-
-
