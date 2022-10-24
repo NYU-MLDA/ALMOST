@@ -2,6 +2,19 @@
 import math
 from evaluator import OMLAEvaluator
 from util_functions import line_prepender
+import os,re
+import os.path as osp
+import os,re,shutil
+from collections import OrderedDict
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from numpy import reshape
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from dcm import dcm
+import pickle
+import pandas as pd
 
 resyn2Cmd =  "balance; rewrite; refactor; balance; rewrite; rewrite -z; balance; refactor -z; rewrite -z; balance;"
 len20SynthesisCmd = resyn2Cmd
@@ -67,13 +80,14 @@ def getSecurityScoresFromOmlaAttack(files):
         synthesizedAIGFolder+" > "+osp.join(os.path.dirname(synthesizedAIGFolder),"log_"+cktprefix+"_cluster.txt")
     returnCode = os.system(perlCmd)
     print(perlCmd,returnCode)
-    omlaEvalObj = OMLAEvaluator(clusterDataFolder,"link.txt",files['ptModel'],device=device)
+    omlaEvalObj = OMLAEvaluator(clusterDataFolder,"link.txt",files['ptModel'],device='cuda')
     omlaEvalObj.prepareData()
     acc,xFeature,yLabel = omlaEvalObj.getOmlaAttackAccuracy()
-    origF1,origN1 = getOrigMetrics(xFeature,yLabel)
-    pcaF1,pcaN1 = getPCAMetrics(xFeature,yLabel)
-    tsneF1,tsneN1 = getTSNEMetrics(xFeature,yLabel)
-    return acc,[origF1,pcaF1,tsneF1],[origN1,pcaN1,tsneN1]
+    # origF1,origN1 = getOrigMetrics(xFeature,yLabel)
+    # pcaF1,pcaN1 = getPCAMetrics(xFeature,yLabel)
+    # tsneF1,tsneN1 = getTSNEMetrics(xFeature,yLabel)
+    #return acc,[origF1,pcaF1,tsneF1],[origN1,pcaN1,tsneN1]
+    return acc,[],[]
      
 
 def simulateABCruns(x,files):

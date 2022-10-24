@@ -202,11 +202,11 @@ class OMLATrainer:
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=50, gamma=0.5)
         
     def trainAndTestOMLA(self,args,epoch):
-        loss = train(args,self.model,self.device,self.train_graphs,self.optimizer,epoch)
+        avg_loss = train(args,self.model,self.device,self.train_graphs,self.optimizer,epoch)
         acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = test(args,self.model,self.device,self.train_graphs,\
             self.val_graphs, epoch,True)
         self.scheduler.step()
-        return acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN
+        return avg_loss,acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN
     
     def testOMLA(self,args,epoch):
         acc_train, acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN = test(args, self.model,self.device,self.train_graphs,\

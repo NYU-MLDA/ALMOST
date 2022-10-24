@@ -105,7 +105,7 @@ def main():
                 f.write("\n")
         if epoch % 2 == 0:
             synID+=1
-            saHandlerObj = SAHandler(validFileForSA,args.lib,dumpFolder,classifier=omlaTrainObj.getOMLAmodel(),max_iterations=3)
+            saHandlerObj = SAHandler(validFileForSA,args.lib,dumpFolder,classifier=omlaTrainObj.getOMLAModel(),max_iterations=3)
             synthesisRecipe = saHandlerObj.runSimulatedAnnealingAttack()
             resynthesisObj = Resynthesizer(args.design,args.lib,synthesisRecipe,synID,origRelockedCktFolder,trainTestFolder,dataFolder)
             resynthesisObj.augmentNewData()
@@ -119,7 +119,7 @@ def main():
             _, acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN = omlaTrainObj.testOMLA(args,epoch)
             model_name = osp.join(dataFolder,'model_model.pth')
             print('Saving final model states to {}...'.format(model_name))
-            torch.save(omlaTrainObj.getOMLAmodel().state_dict(), model_name)
+            torch.save(omlaTrainObj.getOMLAModel().state_dict(), model_name)
             hyper_name = osp.join(dataFolder,'model_hyper.pkl')
             with open(hyper_name, 'wb') as hyperparameters_file:
                 pickle.dump(args, hyperparameters_file)
@@ -130,7 +130,7 @@ def main():
                     f.write("\n")
                     f.write("TP: %d FP: %d TN: %d FN: %d" % (TP,FP,TN,FN))
                     f.write("\n")
-        print(omlaTrainObj.getOMLAmodel().eps)
+        print(omlaTrainObj.getOMLAModel().eps)
     if not args.filename == "":
         with open(args.filename, 'a') as f:
             f.write("Best test for epoch %d Accuracy: %f Precision: %f" % (best_epoch, acc_test,prec_test))
