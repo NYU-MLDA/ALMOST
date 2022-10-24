@@ -126,7 +126,7 @@ class OMLATrainer:
             np.random.shuffle(negList)
             tempList=posList[:lenPos]
             negList=tempList
-        return postList,negList
+        return posList,negList
             
     def prepareData(self,args):
         links_idx = np.loadtxt(self.links_dir, dtype=int)
@@ -177,8 +177,8 @@ class OMLATrainer:
             self.train_neg,
             self.test_pos,
             self.test_neg,
-            self.val_pos,
-            self.val_neg,
+            self.valid_pos,
+            self.valid_neg,
             args.hop,
             node_information,
             args.no_parallel,
@@ -194,8 +194,9 @@ class OMLATrainer:
         print('# train: %d, # test: %d' % (len(self.train_graphs), len(self.test_graphs)))
         
     def createModel(self,args,device):
+        num_classes=2
         self.model = GraphCNN(args.num_layers, args.num_mlp_layers, self.train_graphs[0].node_features.shape[1], \
-            args.hidden_dim, num_classes=2, args.final_dropout, args.learn_eps, args.graph_pooling_type, \
+            args.hidden_dim, num_classes, args.final_dropout, args.learn_eps, args.graph_pooling_type, \
                 args.neighbor_pooling_type, device).to(device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=args.lr)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=50, gamma=0.5)

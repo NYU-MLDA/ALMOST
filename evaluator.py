@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
-from util import load_data, separate_data
+#from util import load_data, separate_data
 from models.graphcnn import GraphCNN
 from trainer import pass_data_iteratively
 import os.path as osp

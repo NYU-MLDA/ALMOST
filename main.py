@@ -4,23 +4,29 @@ import sys, copy, math, time, pdb
 import pickle
 import scipy.io as sio
 import scipy.sparse as ssp
-import os.path
+import os.path as osp
+import os
 import random
 import argparse
-from util_functions import *
+from util_functions import seed_everything
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
 from trainer import OMLATrainer
+from resynthesis import Resynthesizer
+from SAhandler import SAHandler
 
 def main():
     parser = argparse.ArgumentParser(description='OMLA Attack')
     # general settings
-    parser.add_argument('--data-name', default=None, help='network name')
-    parser.add_argument('--file-name', default=None, help='dataset file name')
-    parser.add_argument('--links-name', default=None, help='links name')
+    parser.add_argument('--design', default=None, help='network name')
+    parser.add_argument('--orig_lock', default=None, help='Original folder of relocked circuits')
+    parser.add_argument('--train_test', default=None, help='Train test circuits data folder')
+    parser.add_argument('--feature_dir', default=None, help='Folder having feature information')
+    parser.add_argument('--dump_dir', default=None, help='Dump directory')
+    parser.add_argument('--lib', default=None, help='Dump directory')
     parser.add_argument('--only-predict', action='store_true', default=False,
                         help='if True, will load the saved model and output predictions\
                         for the testing nodes; you still need to specify links-name\
@@ -49,7 +55,7 @@ def main():
                             help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                             help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=350,
+    parser.add_argument('--epochs', type=int, default=3,
                             help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.01,
                             help='learning rate (default: 0.01)')
@@ -75,25 +81,35 @@ def main():
     args = parser.parse_args()
     seed_everything()
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
-    dataFolder
-    dumpFolder
+    origRelockedCktFolder = args.orig_lock
+    trainTestFolder = args.train_test
+    dataFolder=args.feature_dir
+    dumpFolder=args.dump_dir
+    validFileForSA = osp.join(trainTestFolder,"Test_c5315_k64_resyn.v")
     args.hop = int(args.hop)
     omlaTrainObj = OMLATrainer(dataFolder,"link.txt",device)
     omlaTrainObj.prepareData(args)
-    omlaTrainObj.createModel()
+    omlaTrainObj.createModel(args,device)
     
     best_loss = None
     best_epoch = None
     best_test=None
+    synID=0
     
 
     for epoch in range(1, args.epochs + 1):
-        acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = omlaTrainObj.trainAndTestOMLA(args,epoch)
+        avg_loss,acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = omlaTrainObj.trainAndTestOMLA(args,epoch)
         if not args.filename == "":
             with open(args.filename, 'a') as f:
                 f.write("Epoch: %d Training loss: %f Train_Accuracy: %f Validation accuracy: %f" % (epoch, avg_loss, acc_train, acc_val))
                 f.write("\n")
-        print("")
+        if epoch % 2 == 0:
+            synID+=1
+            saHandlerObj = SAHandler(validFileForSA,args.lib,dumpFolder,classifier=omlaTrainObj.getOMLAmodel(),max_iterations=3)
+            synthesisRecipe = saHandlerObj.runSimulatedAnnealingAttack()
+            resynthesisObj = Resynthesizer(args.design,args.lib,synthesisRecipe,synID,origRelockedCktFolder,trainTestFolder,dataFolder)
+            resynthesisObj.augmentNewData()
+            print("\nAugmented new training and validation data..")
         if best_loss is None:
             best_loss = val_loss
         if val_loss <= best_loss:
@@ -103,7 +119,7 @@ def main():
             _, acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN = omlaTrainObj.testOMLA(args,epoch)
             model_name = osp.join(dataFolder,'model_model.pth')
             print('Saving final model states to {}...'.format(model_name))
-            torch.save(model.state_dict(), model_name)
+            torch.save(omlaTrainObj.getOMLAmodel().state_dict(), model_name)
             hyper_name = osp.join(dataFolder,'model_hyper.pkl')
             with open(hyper_name, 'wb') as hyperparameters_file:
                 pickle.dump(args, hyperparameters_file)
@@ -114,7 +130,7 @@ def main():
                     f.write("\n")
                     f.write("TP: %d FP: %d TN: %d FN: %d" % (TP,FP,TN,FN))
                     f.write("\n")
-        print(model.eps)
+        print(omlaTrainObj.getOMLAmodel().eps)
     if not args.filename == "":
         with open(args.filename, 'a') as f:
             f.write("Best test for epoch %d Accuracy: %f Precision: %f" % (best_epoch, acc_test,prec_test))

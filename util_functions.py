@@ -7,6 +7,7 @@ import networkx as nx
 import argparse
 import scipy.io as sio
 import scipy.sparse as ssp
+import os.path as osp
 from sklearn import metrics
 from gensim.models import Word2Vec
 import warnings

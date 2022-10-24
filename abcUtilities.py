@@ -1,6 +1,6 @@
 
 import math
-from GCNEncoding import OMLAEvaluator
+from evaluator import OMLAEvaluator
 from util_functions import line_prepender
 
 resyn2Cmd =  "balance; rewrite; refactor; balance; rewrite; rewrite -z; balance; refactor -z; rewrite -z; balance;"

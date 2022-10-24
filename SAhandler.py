@@ -12,6 +12,7 @@ from abcUtilities import simulateABCruns,getSynthesisCmd
 from util_functions import getSecretKey,sanityCheckPath
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+LIBRARY_FILE="/home/abc586/currentResearch/ML_locking/lib/nangate45.lib"
 # 1- ADP only
 # 2- ADP+F1
 # 3- ADP+N1
