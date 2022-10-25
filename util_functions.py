@@ -24,7 +24,7 @@ def getSecretKey(origLockedFile):
     keyLine = lines[0] # Can be dangerous if the secret key is not dumped in first line
     return keyLine
 
-def seed_everything(seed=566):                                                 
+def seed_everything(seed=42):                                                 
     random.seed(seed)
     #torch.seed(seed)
     #torch.use_deterministic_algorithms(True)                                                 

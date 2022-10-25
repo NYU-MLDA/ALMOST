@@ -16,89 +16,6 @@ from tqdm import tqdm
 from models.graphcnn import GraphCNN
 criterion = nn.CrossEntropyLoss()
 
-def train(args, model, device, train_graphs, optimizer, epoch):
-    model.train()
-    total_iters = args.iters_per_epoch
-    pbar = tqdm(range(total_iters), unit='batch')
-    loss_accum = 0
-    for pos in pbar:
-        selected_idx = np.random.permutation(len(train_graphs))[:args.batch_size]
-        batch_graph = [train_graphs[idx] for idx in selected_idx]
-        output = model(batch_graph)
-        labels = torch.LongTensor([graph.label for graph in batch_graph]).to(device)
-        loss = criterion(output, labels)
-        if optimizer is not None:
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        loss = loss.detach().cpu().numpy()
-        loss_accum += loss
-        pbar.set_description('epoch: %d' % (epoch))
-    average_loss = loss_accum/total_iters
-    print("loss training: %f" % (average_loss))
-    return average_loss
-
-def pass_data_iteratively(model, graphs, minibatch_size = 64):
-    model.eval()
-    output = []
-    idx = np.arange(len(graphs))
-    for i in range(0, len(graphs), minibatch_size):
-        sampled_idx = idx[i:i+minibatch_size]
-        if len(sampled_idx) == 0:
-            continue
-        output.append(model([graphs[j] for j in sampled_idx]).detach())
-    return torch.cat(output, 0)
-
-def test(args, model, device, train_graphs, test_graphs, epoch,val):
-    model.eval()
-    output = pass_data_iteratively(model, train_graphs)
-    pred = output.max(1, keepdim=True)[1]
-    labels = torch.LongTensor([graph.label for graph in train_graphs]).to(device)
-    correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-    acc_train = correct / float(len(train_graphs))
-    loss_train = criterion(output, labels)
-    loss_train = loss_train.detach().cpu().numpy()
-    output = pass_data_iteratively(model, test_graphs)
-    pred = output.max(1, keepdim=True)[1]
-    labels = torch.LongTensor([graph.label for graph in test_graphs]).to(device)
-    correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-    acc_test = correct / float(len(test_graphs))
-    TP=0
-    FP=0
-    TN=0
-    FN=0
-    i=0
-    for l in labels.view_as(pred):
-        if not val:#new
-            print("keygate index is:")
-            print(str(test_graphs[i].keygate))#new
-        print("True is "+str(l)+" predicted is "+str(pred[i]))
-        if pred[i]==1:
-            if l==1:
-                TP=TP+1
-            else:
-                FP=FP+1
-        else:
-            if l==0:
-                TN=TN+1
-            else:
-                FN=FN+1
-        i=i+1
-    if TP+FP != 0:
-        prec_test=(TP/(TP+FP))*100
-    else:
-        prec_test=100
-
-    loss_test = criterion(output, labels)
-    loss_test = loss_test.detach().cpu().numpy()
-    if val:
-        print("accuracy train: %f val: %f" % (acc_train, acc_test))
-        print("loss train: %f val: %f" % (loss_train, loss_test))
-        print("Precision Val is: "+str(prec_test))
-    else:
-        print("accuracy train: %f test: %f" % (acc_train, acc_test))
-        print("Precision Test is: "+str(prec_test))
-    return acc_train, acc_test, loss_train, loss_test, prec_test, TP, FP, TN, FN
 
 class OMLATrainer:
     def __init__(self,parentFolder,links_name,device):
@@ -201,16 +118,105 @@ class OMLATrainer:
         self.optimizer = optim.Adam(self.model.parameters(), lr=args.lr)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=50, gamma=0.5)
         
+    def train(self,args,epoch):
+        self.model.train()
+        total_iters = args.iters_per_epoch
+        pbar = tqdm(range(total_iters), unit='batch')
+        loss_accum = 0
+        for pos in pbar:
+            selected_idx = np.random.permutation(len(self.train_graphs))[:args.batch_size]
+            batch_graph = [self.train_graphs[idx] for idx in selected_idx]
+            output = self.model(batch_graph)
+            labels = torch.LongTensor([graph.label for graph in batch_graph]).to(self.device)
+            loss = criterion(output,labels)
+            if self.optimizer is not None:
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+            loss = loss.detach().cpu().numpy()
+            loss_accum += loss
+            pbar.set_description('epoch: %d' % (epoch))
+        average_loss = loss_accum/total_iters
+        print("loss training: %f" % (average_loss))
+        return average_loss
+    
+    def pass_data_iteratively(self,graphs,minibatch_size = 64):
+        self.model.eval()
+        output = []
+        idx = np.arange(len(graphs))
+        for i in range(0, len(graphs), minibatch_size):
+            sampled_idx = idx[i:i+minibatch_size]
+            if len(sampled_idx) == 0:
+                continue
+            output.append(self.model([graphs[j] for j in sampled_idx]).detach())
+        return torch.cat(output, 0)
+    
+    def test(self,args,epoch,val):
+        self.model.eval()
+        output = self.pass_data_iteratively(self.train_graphs)
+        pred = output.max(1, keepdim=True)[1]
+        labels = torch.LongTensor([graph.label for graph in self.train_graphs]).to(self.device)
+        correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+        acc_train = correct / float(len(self.train_graphs))
+        loss_train = criterion(output, labels)
+        loss_train = loss_train.detach().cpu().numpy()
+        if val:
+            output = self.pass_data_iteratively(self.test_graphs)
+            pred = output.max(1, keepdim=True)[1]
+            labels = torch.LongTensor([graph.label for graph in self.test_graphs]).to(self.device)
+            correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+            acc_test = correct / float(len(self.test_graphs))
+        else:
+            output = self.pass_data_iteratively(self.val_graphs)
+            pred = output.max(1, keepdim=True)[1]
+            labels = torch.LongTensor([graph.label for graph in self.val_graphs]).to(self.device)
+            correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+            acc_test = correct / float(len(self.val_graphs))
+        TP=0
+        FP=0
+        TN=0
+        FN=0
+        i=0
+        for l in labels.view_as(pred):
+            if not val:#new
+                print("keygate index is:")
+                print(str(self.test_graphs[i].keygate))#new
+            print("True is "+str(l)+" predicted is "+str(pred[i]))
+            if pred[i]==1:
+                if l==1:
+                    TP=TP+1
+                else:
+                    FP=FP+1
+            else:
+                if l==0:
+                    TN=TN+1
+                else:
+                    FN=FN+1
+            i=i+1
+        if TP+FP != 0:
+            prec_test=(TP/(TP+FP))*100
+        else:
+            prec_test=100
+
+        loss_test = criterion(output, labels)
+        loss_test = loss_test.detach().cpu().numpy()
+        if val:
+            print("accuracy train: %f val: %f" % (acc_train, acc_test))
+            print("loss train: %f val: %f" % (loss_train, loss_test))
+            print("Precision Val is: "+str(prec_test))
+        else:
+            print("accuracy train: %f test: %f" % (acc_train, acc_test))
+            print("Precision Test is: "+str(prec_test))
+        return acc_train, acc_test, loss_train, loss_test, prec_test, TP, FP, TN, FN
+        
     def trainAndTestOMLA(self,args,epoch):
-        avg_loss = train(args,self.model,self.device,self.train_graphs,self.optimizer,epoch)
-        acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = test(args,self.model,self.device,self.train_graphs,\
-            self.val_graphs, epoch,True)
+        avg_loss = self.train(args,epoch)
+        acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = self.test(args,epoch,True)
         self.scheduler.step()
         return avg_loss,acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN
     
     def testOMLA(self,args,epoch):
-        acc_train, acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN = test(args, self.model,self.device,self.train_graphs,\
-            self.test_graphs, epoch,False)
+        acc_train, acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN = self.test(args,epoch,False)
         return acc_train,acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN
     
     def getOMLAModel(self):

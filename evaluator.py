@@ -21,21 +21,8 @@ import torch.optim as optim
 from tqdm import tqdm
 #from util import load_data, separate_data
 from models.graphcnn import GraphCNN
-from trainer import pass_data_iteratively
 import os.path as osp
 num_classes = 2
-
-
-def test_new(model, device, test_graphs):
-    model.eval()
-    output = pass_data_iteratively(model, test_graphs)
-    pred = output.max(1, keepdim=True)[1]
-    labels = torch.LongTensor([graph.label for graph in test_graphs]).to(device)
-    correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-    correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-    acc_test = correct / float(len(test_graphs))
-    print("accuracy test: %f" % (acc_test))
-    return acc_test, labels, pred
 
 
 class OMLAEvaluator:
@@ -47,6 +34,28 @@ class OMLAEvaluator:
         self.links_dir = os.path.join(self.parentFolder,'{}'.format(self.links_name))
         self.pos_dir = os.path.join(self.parentFolder,'{}'.format('node_te_pos.txt'))
         self.neg_dir = os.path.join(self.parentFolder,'{}'.format('node_te_neg.txt'))
+        
+    def pass_data_iteratively(self,graphs,minibatch_size = 64):
+        self.preTrainedModel.eval()
+        output = []
+        idx = np.arange(len(graphs))
+        for i in range(0, len(graphs), minibatch_size):
+            sampled_idx = idx[i:i+minibatch_size]
+            if len(sampled_idx) == 0:
+                continue
+            output.append(self.preTrainedModel([graphs[j] for j in sampled_idx]).detach())
+        return torch.cat(output, 0)
+    
+    def test_new(self,test_graphs):
+        self.preTrainedModel.eval()
+        output = self.pass_data_iteratively(test_graphs)
+        pred = output.max(1, keepdim=True)[1]
+        labels = torch.LongTensor([graph.label for graph in test_graphs]).to(self.device)
+        correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+        correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+        acc_test = correct / float(len(test_graphs))
+        print("accuracy test: %f" % (acc_test))
+        return acc_test, labels, pred
         
         
     def prepareData(self):
@@ -113,7 +122,7 @@ class OMLAEvaluator:
         self.x=np.array(X)
         scaler = StandardScaler()
         self.x= scaler.fit_transform(self.x)
-        acc_test,_,_ = test_new(self.preTrainedModel,self.device,test_graphs)
+        acc_test,_,_ = self.test_new(test_graphs)
         return acc_test,self.x,self.y
     
 if __name__ == '__main__':

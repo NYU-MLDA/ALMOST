@@ -53,9 +53,9 @@ def main():
                             help='which gpu to use if any (default: 0)')
     parser.add_argument('--batch_size', type=int, default=32,
                             help='input batch size for training (default: 32)')
-    parser.add_argument('--iters_per_epoch', type=int, default=50,
+    parser.add_argument('--iters_per_epoch', type=int, default=400,
                             help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=3,
+    parser.add_argument('--epochs', type=int, default=50,
                             help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.01,
                             help='learning rate (default: 0.01)')
@@ -103,13 +103,13 @@ def main():
             with open(args.filename, 'a') as f:
                 f.write("Epoch: %d Training loss: %f Train_Accuracy: %f Validation accuracy: %f" % (epoch, avg_loss, acc_train, acc_val))
                 f.write("\n")
-        if epoch % 2 == 0:
-            synID+=1
-            saHandlerObj = SAHandler(validFileForSA,args.lib,dumpFolder,classifier=omlaTrainObj.getOMLAModel(),max_iterations=3)
-            synthesisRecipe = saHandlerObj.runSimulatedAnnealingAttack()
-            resynthesisObj = Resynthesizer(args.design,args.lib,synthesisRecipe,synID,origRelockedCktFolder,trainTestFolder,dataFolder)
-            resynthesisObj.augmentNewData()
-            print("\nAugmented new training and validation data..")
+        # if epoch % 10 == 0:
+        #     synID+=1
+        #     saHandlerObj = SAHandler(validFileForSA,args.lib,dumpFolder,classifier=omlaTrainObj.getOMLAModel(),max_iterations=120)
+        #     synthesisRecipe = saHandlerObj.runSimulatedAnnealingAttack()
+        #     resynthesisObj = Resynthesizer(args.design,args.lib,synthesisRecipe,synID,origRelockedCktFolder,trainTestFolder,dataFolder)
+        #     resynthesisObj.augmentNewData()
+        #     print("\nAugmented new training and validation data..")
         if best_loss is None:
             best_loss = val_loss
         if val_loss <= best_loss:
