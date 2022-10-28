@@ -184,6 +184,7 @@ def subgraph_extraction_labeling(ind, A, B, h=2,node_information=None,DE_FLAG=Tr
         print(labels.shape)
         labels=labels.reshape(1,1)
     return g, labels.tolist(), features_, ind
+
 def direction(node,A,B):
     print("Inside Direction for node "+str(node))
     fri=set()
@@ -198,6 +199,7 @@ def direction(node,A,B):
     print("Those are fan out neighbors!")
     print(fan_out)
     return fan_out, fan_in
+
 def neighbors(fringe, A):
     # find all 1-hop neighbors of nodes in fringe from A
     res = []
@@ -222,6 +224,7 @@ def neighbors_fanout(fringe, A):
         nei = list(nei)
         res = union_list(res,nei)
     return res
+
 def union_list(first_list,second_list):
     resulting_list = list(first_list)
     resulting_list.extend(x for x in second_list if x not in resulting_list)

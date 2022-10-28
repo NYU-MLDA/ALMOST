@@ -30,6 +30,11 @@ class OMLATrainer:
         self.test_pos_dir = os.path.join(self.parentFolder,'{}'.format('node_te_pos.txt'))
         self.test_neg_dir = os.path.join(self.parentFolder,'{}'.format('node_te_neg.txt'))
         
+    def assignData(self,trainGraphs,testGraphs,valGraphs):
+        self.train_graphs = trainGraphs
+        self.test_graphs = testGraphs
+        self.val_graphs = valGraphs
+
     def balanceSamples(self,posList,negList):
         lenPos = len(posList)
         lenNeg = len(negList)
@@ -101,14 +106,14 @@ class OMLATrainer:
             args.no_parallel,
             args.use_dis
         )
-        
+        print('Before # train: %d, # test: %d' % (len(self.train_graphs), len(self.test_graphs)))
         random.shuffle(self.train_graphs)
         if args.split_val: #In case you want to shuffle and get 10% for validation
             self.train_graphs.extend(self.val_graphs)
             val_num = int(0.1 * len(self.train_graphs))
             self.val_graphs = self.train_graphs[:val_num]
             self.train_graphs = self.train_graphs[val_num:]
-        print('# train: %d, # test: %d' % (len(self.train_graphs), len(self.test_graphs)))
+        print('After # train: %d, # test: %d' % (len(self.train_graphs), len(self.test_graphs)))
         
     def createModel(self,args,device):
         num_classes=2
@@ -129,10 +134,10 @@ class OMLATrainer:
             output = self.model(batch_graph)
             labels = torch.LongTensor([graph.label for graph in batch_graph]).to(self.device)
             loss = criterion(output,labels)
-            if self.optimizer is not None:
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+            #if self.optimizer is not None:
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
             loss = loss.detach().cpu().numpy()
             loss_accum += loss
             pbar.set_description('epoch: %d' % (epoch))
@@ -161,17 +166,17 @@ class OMLATrainer:
         loss_train = criterion(output, labels)
         loss_train = loss_train.detach().cpu().numpy()
         if val:
-            output = self.pass_data_iteratively(self.test_graphs)
-            pred = output.max(1, keepdim=True)[1]
-            labels = torch.LongTensor([graph.label for graph in self.test_graphs]).to(self.device)
-            correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-            acc_test = correct / float(len(self.test_graphs))
-        else:
             output = self.pass_data_iteratively(self.val_graphs)
             pred = output.max(1, keepdim=True)[1]
             labels = torch.LongTensor([graph.label for graph in self.val_graphs]).to(self.device)
             correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
             acc_test = correct / float(len(self.val_graphs))
+        else:
+            output = self.pass_data_iteratively(self.test_graphs)
+            pred = output.max(1, keepdim=True)[1]
+            labels = torch.LongTensor([graph.label for graph in self.test_graphs]).to(self.device)
+            correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+            acc_test = correct / float(len(self.test_graphs))
         TP=0
         FP=0
         TN=0
@@ -181,7 +186,7 @@ class OMLATrainer:
             if not val:#new
                 print("keygate index is:")
                 print(str(self.test_graphs[i].keygate))#new
-            print("True is "+str(l)+" predicted is "+str(pred[i]))
+            #print("True is "+str(l)+" predicted is "+str(pred[i]))
             if pred[i]==1:
                 if l==1:
                     TP=TP+1
@@ -210,9 +215,9 @@ class OMLATrainer:
         return acc_train, acc_test, loss_train, loss_test, prec_test, TP, FP, TN, FN
         
     def trainAndTestOMLA(self,args,epoch):
+        self.scheduler.step()
         avg_loss = self.train(args,epoch)
         acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = self.test(args,epoch,True)
-        self.scheduler.step()
         return avg_loss,acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN
     
     def testOMLA(self,args,epoch):
@@ -221,3 +226,6 @@ class OMLATrainer:
     
     def getOMLAModel(self):
         return self.model
+    
+    def getData(self):
+        return self.train_graphs,self.val_graphs,self.test_graphs

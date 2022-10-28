@@ -17,6 +17,122 @@ from tqdm import tqdm
 from trainer import OMLATrainer
 from resynthesis import Resynthesizer
 from SAhandler import SAHandler
+from models.graphcnn import GraphCNN
+from evaluator import OMLAEvaluator
+#from util_functions_orig import *
+from util_functions import *
+#criterion = nn.CrossEntropyLoss()
+
+
+def prepareData(args,parentFolder,links_name):
+    a_list=[]
+    val_pos, val_neg, train_pos, test_pos,train_neg,test_neg,link_pos = None,None, None, None,None,None,None
+    print("The link file was provided")
+    args.links_dir = os.path.join(parentFolder,'{}'.format(links_name))
+    links_idx = np.loadtxt(args.links_dir, dtype=int)
+    links_pos = (links_idx[:, 0], links_idx[:, 1])
+    args.train_dir = os.path.join(parentFolder,'{}'.format('node_tr_pos.txt'))
+    train_pos = np.loadtxt(args.train_dir, dtype=int)
+    args.train_dir = os.path.join(parentFolder,'{}'.format('node_tr_neg.txt'))
+    train_neg = np.loadtxt(args.train_dir, dtype=int)
+    if (len(train_neg)>len(train_pos)):
+        print("We have imbalance. Neg > Pos")
+        np.random.shuffle(train_neg)
+        train_temp=train_neg[:len(train_pos)]
+        train_neg=train_temp
+    elif (len(train_pos)>len(train_neg)):
+        print("We have imbalance. Pos > Neg")
+        np.random.shuffle(train_pos)
+        train_temp=train_pos[:len(train_neg)]
+        train_pos=train_temp
+
+    print("Length of train neg is "+str(len(train_neg))+" and length of train positive is "+str(len(train_pos)))
+
+    args.train_dir = os.path.join(parentFolder,'{}'.format('node_va_pos.txt'))
+    val_pos = np.loadtxt(args.train_dir, dtype=int)
+
+
+    args.train_dir = os.path.join(parentFolder,'{}'.format('node_va_neg.txt'))
+    val_neg = np.loadtxt(args.train_dir, dtype=int)
+
+
+    if (len(val_neg)>len(val_pos)):
+        print("We have imbalance. Neg > Pos")
+        np.random.shuffle(val_neg)
+        val_temp=val_neg[:len(val_pos)]
+        val_neg=val_temp
+    elif (len(val_pos)>len(val_neg)):
+        print("We have imbalance. Pos > Neg")
+        np.random.shuffle(val_pos)
+        val_temp=val_pos[:len(val_neg)]
+        val_pos=val_temp
+    args.train_dir =os.path.join(parentFolder,'{}'.format('node_te_pos.txt'))
+    test_pos = np.loadtxt(args.train_dir, dtype=int)
+
+    test_idxx = np.loadtxt(args.train_dir, dtype=int)
+    a_list.append(test_idxx)
+
+
+    args.train_dir = os.path.join(parentFolder,'{}'.format('node_te_neg.txt'))
+    test_neg = np.loadtxt(args.train_dir, dtype=int)
+
+
+
+    test_idx2 = np.loadtxt(args.train_dir, dtype=int)
+    a_list.append(test_idx2)
+    test_idx=np.concatenate(a_list)
+
+    print("All done!")
+
+    cell=[]
+    feat=[]
+    count=[]
+    feats_test = np.loadtxt(os.path.join(parentFolder,'feat.txt'), dtype='float32')
+    count = np.loadtxt(os.path.join(parentFolder,'count.txt'))
+    cell = np.genfromtxt(os.path.join(parentFolder,'cell.txt'), dtype=str)
+    arr1inds = count.argsort()
+    sorted_count = count[arr1inds[0::]]
+    attributes = feats_test[arr1inds[0::]]
+    sorted_cell = cell[arr1inds[0::]]
+
+    max_idx = np.max(links_idx)
+    net = ssp.csc_matrix((np.ones(len(links_idx)), (links_idx[:, 0], links_idx[:, 1])), shape=(max_idx+1, max_idx+1) )
+
+    net[np.arange(max_idx+1), np.arange(max_idx+1)] = 0  # remove self-loops
+    B=net.copy() # a matrix without semmetric edges
+    B.eliminate_zeros()
+    net[links_idx[:, 1], links_idx[:, 0]] = 1  # add symmetric edges
+    net[np.arange(max_idx+1), np.arange(max_idx+1)] = 0  # remove self-loops
+
+    '''Train and apply classifier'''
+    A = net.copy()  # the observed network
+    A.eliminate_zeros()  # make sure the links are masked when using the sparse matrix in scipy-1.3.x
+
+    node_information = attributes
+    train_graphs, test_graphs,val_graphs = keygates2subgraphs(
+            A,
+            B,
+            train_pos,
+            train_neg,
+            test_pos,
+            test_neg,
+            val_pos,
+            val_neg,
+            args.hop,
+            node_information,
+            args.no_parallel,
+            args.use_dis
+    )
+    # New data saving
+    print('Before # train: %d, # test: %d' % (len(train_graphs), len(test_graphs)))
+    random.shuffle(train_graphs)
+    if args.split_val: #In case you want to shuffle and get 10% for validation
+        train_graphs.extend(val_graphs)
+        val_num = int(0.1 * len(train_graphs))
+        val_graphs = train_graphs[:val_num]
+        train_graphs = train_graphs[val_num:]
+    print('After # train: %d, # test: %d' % (len(train_graphs), len(test_graphs)))
+    return train_graphs, test_graphs,val_graphs
 
 def main():
     parser = argparse.ArgumentParser(description='OMLA Attack')
@@ -36,6 +152,8 @@ def main():
     parser.add_argument('--no-parallel', action='store_true', default=False,
                         help='if True, use single thread for subgraph extraction; \
                         by default use all cpu cores to extract subgraphs in parallel')
+    parser.add_argument('--enable_sa', action='store_true', default=False,
+                        help='If true, performs data augmentation with simulated annealing attack')
     # model settings
     parser.add_argument('--hop', default=1, metavar='S',
                         help='enclosing subgraph hop number, \
@@ -53,10 +171,10 @@ def main():
                             help='which gpu to use if any (default: 0)')
     parser.add_argument('--batch_size', type=int, default=32,
                             help='input batch size for training (default: 32)')
-    parser.add_argument('--iters_per_epoch', type=int, default=400,
+    parser.add_argument('--iters_per_epoch', type=int, default=50,
                             help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=50,
-                            help='number of epochs to train (default: 350)')
+    parser.add_argument('--epochs', type=int, default=350,
+                            help='number of epochs to train (default: 351)')
     parser.add_argument('--lr', type=float, default=0.01,
                             help='learning rate (default: 0.01)')
     parser.add_argument('--num_layers', type=int, default=5,
@@ -80,6 +198,11 @@ def main():
 
     args = parser.parse_args()
     seed_everything()
+    num_classes=2
+    #torch.manual_seed(0)
+    #np.random.seed(0)
+    #if torch.cuda.is_available():
+    #    torch.cuda.manual_seed_all(0)
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
     origRelockedCktFolder = args.orig_lock
     trainTestFolder = args.train_test
@@ -87,50 +210,73 @@ def main():
     dumpFolder=args.dump_dir
     validFileForSA = osp.join(trainTestFolder,"Test_c5315_k64_resyn.v")
     args.hop = int(args.hop)
+    if args.only_predict:
+        omlaEvalObj = OMLAEvaluator(dataFolder,"link.txt",device='cuda')
+        omlaEvalObj.prepareData()
+        omlaEvalObj.loadPreTrainedModel()
+        acc,_,_ = omlaEvalObj.getOmlaAttackAccuracy()
+        print("Test acc. {}".format(acc))
+        exit(0)
     omlaTrainObj = OMLATrainer(dataFolder,"link.txt",device)
-    omlaTrainObj.prepareData(args)
+    #omlaTrainObj.prepareData(args)
+    #train_graphs,val_graphs,test_graphs = omlaTrainObj.getData()
+    train_graphs, test_graphs,val_graphs = prepareData(args,dataFolder,"link.txt")
+    omlaTrainObj.assignData(train_graphs, test_graphs,val_graphs)
     omlaTrainObj.createModel(args,device)
     
+    #model = GraphCNN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.learn_eps, args.graph_pooling_type, args.neighbor_pooling_type, device).to(device)
+    #optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    #scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
     best_loss = None
     best_epoch = None
     best_test=None
     synID=0
-    
 
     for epoch in range(1, args.epochs + 1):
         avg_loss,acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = omlaTrainObj.trainAndTestOMLA(args,epoch)
+        #scheduler.step()
+        #avg_loss = train(args, model, device, train_graphs, optimizer, epoch)
+        #acc_train, acc_val, loss_train,val_loss,prec_val, TP,FP,TN,FN = test(args,model,device,train_graphs,val_graphs, epoch,True)
         if not args.filename == "":
             with open(args.filename, 'a') as f:
-                f.write("Epoch: %d Training loss: %f Train_Accuracy: %f Validation accuracy: %f" % (epoch, avg_loss, acc_train, acc_val))
+                f.write("Epoch: %d, trn_loss: %f, trn_acc: %f, val_loss: %f, val_acc: %f" % (epoch, avg_loss, acc_train,val_loss,acc_val))
                 f.write("\n")
-        # if epoch % 10 == 0:
-        #     synID+=1
-        #     saHandlerObj = SAHandler(validFileForSA,args.lib,dumpFolder,classifier=omlaTrainObj.getOMLAModel(),max_iterations=120)
-        #     synthesisRecipe = saHandlerObj.runSimulatedAnnealingAttack()
-        #     resynthesisObj = Resynthesizer(args.design,args.lib,synthesisRecipe,synID,origRelockedCktFolder,trainTestFolder,dataFolder)
-        #     resynthesisObj.augmentNewData()
-        #     print("\nAugmented new training and validation data..")
+        if args.enable_sa and epoch % 50 == 0:
+            print("\nRunning simulated annealing attack...")
+            synID+=1
+            saHandlerObj = SAHandler(validFileForSA,args.lib,dumpFolder,classifier=omlaTrainObj.getOMLAModel(),max_iterations=120)
+            synthesisRecipe = saHandlerObj.runSimulatedAnnealingAttack()
+            resynthesisObj = Resynthesizer(args.design,args.lib,synthesisRecipe,synID,origRelockedCktFolder,trainTestFolder,dataFolder)
+            resynthesisObj.augmentNewData()
+            print("\nAugmented new training and validation data..")
+            train_graphs, test_graphs,val_graphs = prepareData(args,dataFolder,"link.txt")
+            omlaTrainObj.assignData(train_graphs, test_graphs,val_graphs)
         if best_loss is None:
-            best_loss = val_loss
-        if val_loss <= best_loss:
+            #best_loss = val_loss
+            best_loss = acc_val
+        #if val_loss <= best_loss:
+        if acc_val >= best_loss:
             print("Epoch "+str(epoch)+"Is better, performing testing")
             best_loss = val_loss
+            best_loss=acc_val
             best_epoch = epoch
             _, acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN = omlaTrainObj.testOMLA(args,epoch)
+            #_, acc_test, loss_train,loss_test,prec_test,TP,FP,TN,FN = test(args, model, device, train_graphs, test_graphs, epoch,False)
             model_name = osp.join(dataFolder,'model_model.pth')
             print('Saving final model states to {}...'.format(model_name))
             torch.save(omlaTrainObj.getOMLAModel().state_dict(), model_name)
+            #torch.save(model.state_dict(), model_name)
             hyper_name = osp.join(dataFolder,'model_hyper.pkl')
             with open(hyper_name, 'wb') as hyperparameters_file:
                 pickle.dump(args, hyperparameters_file)
                 print('Saving hyperparameters to {}...'.format(hyper_name))
             if not args.filename == "":
                 with open(args.filename, 'a') as f:
-                    f.write("Epoch is best: %d Training loss: %f Train_Accuracy: %f Test accuracy: %f" % (epoch, avg_loss, acc_train, acc_test))
+                    f.write("Best epoch: %d trn_loss: %f, trn_acc: %f, test_acc: %f" % (epoch, avg_loss, acc_train, acc_test))
                     f.write("\n")
                     f.write("TP: %d FP: %d TN: %d FN: %d" % (TP,FP,TN,FN))
                     f.write("\n")
-        print(omlaTrainObj.getOMLAModel().eps)
+        #print(omlaTrainObj.getOMLAModel().eps)
     if not args.filename == "":
         with open(args.filename, 'a') as f:
             f.write("Best test for epoch %d Accuracy: %f Precision: %f" % (best_epoch, acc_test,prec_test))
