@@ -21,8 +21,8 @@ class Resynthesizer:
         self.synID = synID
         self.dataFolder = dataFolder
         self.lib=library
-        self.trainFiles = glob.glob(osp.join(origRelockedFileLoc,"Train*"))
-        self.validFiles = glob.glob(osp.join(origRelockedFileLoc,"Valid*"))
+        self.trainFiles = glob.glob(osp.join(origRelockedFileLoc,"Train*"))[:100]
+        self.validFiles = glob.glob(osp.join(origRelockedFileLoc,"Valid*"))[:20]
         self.trnTstFilePath = trainTestFileDestination
         
     def synthesizeFiles(self,fileList,dataTypeKeyword):
