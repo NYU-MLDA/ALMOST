@@ -193,7 +193,7 @@ class GraphCNN(nn.Module):
 
 
     def forward(self, batch_graph):
-        print("Size of features is "+str(len(batch_graph[0].node_features[0])))
+        #print("Size of features is "+str(len(batch_graph[0].node_features[0])))
         X_concat = torch.cat([graph.node_features for graph in batch_graph], 0).to(self.device)
         graph_pool = self.__preprocess_graphpool(batch_graph)
 
