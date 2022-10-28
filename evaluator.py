@@ -26,7 +26,7 @@ num_classes = 2
 
 
 class OMLAEvaluator:
-    def __init__(self,parentFolder,links_name,preTrainedModel,device):
+    def __init__(self,parentFolder,links_name,preTrainedModel=None,device=None):
         self.parentFolder = parentFolder
         self.links_name = links_name
         self.preTrainedModel = preTrainedModel
@@ -34,6 +34,26 @@ class OMLAEvaluator:
         self.links_dir = os.path.join(self.parentFolder,'{}'.format(self.links_name))
         self.pos_dir = os.path.join(self.parentFolder,'{}'.format('node_te_pos.txt'))
         self.neg_dir = os.path.join(self.parentFolder,'{}'.format('node_te_neg.txt'))
+        
+    def loadPreTrainedModel(self):
+        if not self.preTrainedModel == None:
+            print("Serious issue.. Recheck..")
+            exit(0)
+        num_classes=2
+        sanityCheckPath(osp.join(self.parentFolder,'model_hyper.pkl'))
+        sanityCheckPath(osp.join(self.parentFolder,'model_model.pth'))
+        with open(osp.join(self.parentFolder,'model_hyper.pkl'),'rb') as hyperparameters_name:
+            saved_args = pickle.load(hyperparameters_name)
+        argsDict = {}
+        for key, value in vars(saved_args).items(): # replace with saved cmd_args
+            argsDict[key] = value
+        classifier = GraphCNN(argsDict['num_layers'], argsDict['num_mlp_layers'],self.test_graphs[0].node_features.shape[1],argsDict['hidden_dim'], num_classes, argsDict['final_dropout'], \
+            argsDict['learn_eps'], argsDict['graph_pooling_type'], argsDict['neighbor_pooling_type'], self.device).to(self.device)
+        if torch.cuda.is_available():
+            classifier = classifier.cuda()
+        model_name = osp.join(self.parentFolder,'model_model.pth')
+        classifier.load_state_dict(torch.load(model_name))
+        self.preTrainedModel = classifier
         
     def pass_data_iteratively(self,graphs,minibatch_size = 64):
         self.preTrainedModel.eval()
@@ -46,14 +66,14 @@ class OMLAEvaluator:
             output.append(self.preTrainedModel([graphs[j] for j in sampled_idx]).detach())
         return torch.cat(output, 0)
     
-    def test_new(self,test_graphs):
+    def test_new(self):
         self.preTrainedModel.eval()
-        output = self.pass_data_iteratively(test_graphs)
+        output = self.pass_data_iteratively(self.test_graphs)
         pred = output.max(1, keepdim=True)[1]
-        labels = torch.LongTensor([graph.label for graph in test_graphs]).to(self.device)
+        labels = torch.LongTensor([graph.label for graph in self.test_graphs]).to(self.device)
         correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
         correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-        acc_test = correct / float(len(test_graphs))
+        acc_test = correct / float(len(self.test_graphs))
         print("accuracy test: %f" % (acc_test))
         return acc_test, labels, pred
         
@@ -85,12 +105,8 @@ class OMLAEvaluator:
         
         self.A = self.net.copy()  # the observed network
         self.A.eliminate_zeros()  # make sure the links are masked when using the sparse matrix in scipy-1.3.x
-    
-    
-    def getOmlaAttackAccuracy(self):
+        
         node_information = None
-        #embeddings = generate_node2vec_embeddings(self.A,12)
-        #node_information = embeddings
         if self.attributes is not None:
             if node_information is not None:
                 node_information = np.concatenate([node_information, self.attributes], axis=1)
@@ -112,9 +128,15 @@ class OMLAEvaluator:
                 True
             )
         print('# test: %d' % (len(test_graphs)))
+        self.test_graphs=test_graphs
+    
+    
+    def getOmlaAttackAccuracy(self):
+        #embeddings = generate_node2vec_embeddings(self.A,12)
+        #node_information = embeddings
         Y=[]
         X=[]
-        for graph in test_graphs:
+        for graph in self.test_graphs:
             Y.append(int(graph.label))
             X.append(torch.sum(graph.node_features, dim=0).tolist())
 
@@ -122,7 +144,7 @@ class OMLAEvaluator:
         self.x=np.array(X)
         scaler = StandardScaler()
         self.x= scaler.fit_transform(self.x)
-        acc_test,_,_ = self.test_new(test_graphs)
+        acc_test,_,_ = self.test_new()
         return acc_test,self.x,self.y
     
 if __name__ == '__main__':
