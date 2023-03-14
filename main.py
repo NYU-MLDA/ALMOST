@@ -9,6 +9,10 @@ import os
 import random
 import argparse
 from util_functions import seed_everything
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +25,7 @@ from models.graphcnn import GraphCNN
 from evaluator import OMLAEvaluator
 #from util_functions_orig import *
 from util_functions import *
+
 #criterion = nn.CrossEntropyLoss()
 
 
@@ -208,14 +213,29 @@ def main():
     trainTestFolder = args.train_test
     dataFolder=args.feature_dir
     dumpFolder=args.dump_dir
-    validFileForSA = osp.join(trainTestFolder,"Test_c5315_k64_resyn.v")
+    validFileForSA = osp.join(trainTestFolder,"Test_"+args.design+"_k64_resyn.v")
     args.hop = int(args.hop)
     if args.only_predict:
         omlaEvalObj = OMLAEvaluator(dataFolder,"link.txt",device='cuda')
         omlaEvalObj.prepareData()
         omlaEvalObj.loadPreTrainedModel()
-        acc,_,_ = omlaEvalObj.getOmlaAttackAccuracy()
+        acc,x,y = omlaEvalObj.getOmlaAttackAccuracy()
         print("Test acc. {}".format(acc))
+        print("x here")
+        print(x)
+        tsne = TSNE(n_components=2, verbose=1, random_state=123)
+        z = tsne.fit_transform(x)
+        df = pd.DataFrame()
+        df["y"] = y
+        df["comp-1"] = z[:,0]
+        df["comp-2"] = z[:,1]
+        X=z
+        kmeans = KMeans(n_clusters=2)#, init='k-means++', max_iter=300, n_init=10, random_state=0)
+        pred_y = kmeans.fit_predict(X)
+        #clt_sim_matrix.fit(pred_y)
+        plt.scatter(X[:,0],X[:,1],c=df.y.tolist() )
+        plt.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], s=300, c='red')
+        plt.savefig(osp.join(dataFolder,'cluster'+args.design+'_v'+'_TSNE.png'))
         exit(0)
     omlaTrainObj = OMLATrainer(dataFolder,"link.txt",device)
     #omlaTrainObj.prepareData(args)
