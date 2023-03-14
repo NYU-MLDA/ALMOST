@@ -20,7 +20,8 @@ my $body="";
 
 my $RLL_key_status =$x[rand @x];
 #my $RLL_key_status =1;
-my $RLL_track_key=64; #we start from 64
+my $RLL_track_key=128; #we start from 64
+my $original_key=128; #we start from 64
 my %RLL_key_map=();
 my $header="";
 my $key_size=0;
@@ -358,7 +359,7 @@ $instance_name="";
     my @shuffled_indexes_false = shuffle(0..$#list_of_gates_original);
 
 # Get just N of them.
-my @pick_indexes_false = @shuffled_indexes_false[ 0 .. 64 - 1 ];  
+my @pick_indexes_false = @shuffled_indexes_false[ 0 .. $original_key - 1 ];  
 
 # Pick cards from @deck
 my @false_wires = @list_of_gates_original[ @pick_indexes_false ];
@@ -368,7 +369,7 @@ my @false_wires = @list_of_gates_original[ @pick_indexes_false ];
     my @shuffled_indexes = shuffle(0..$#list_of_gates_original);
 
 # Get just N of them.
-my @pick_indexes = @shuffled_indexes[ 0 .. 64 - 1 ];  
+my @pick_indexes = @shuffled_indexes[ 0 .. $original_key - 1 ];  
 
 # Pick cards from @deck
 my @picks = @list_of_gates_original[ @pick_indexes ];
@@ -464,11 +465,13 @@ make_path($output_dir) ;
 
         if ( $line =~ /^\s*(endmodule)\b/ ) { 
 #print "this is the module $module_id\n";         
+
+#print "Found end of the module\n";
 $module_declaration=~s/module\s+${module_id}\s*\(/module locked_${module_id}(/;   
 	$body .= "\n" . $line;
           $count=$key_size-1; #so that I start from 0
-                while ( $count >= 64 ) {
-                if ($count==64)
+                while ( $count >= $original_key ) {
+                if ($count==$original_key)
                 {
                    $module_declaration .= ", KEYINPUT" . $count.")\;\n";
                    }
@@ -484,7 +487,7 @@ $module_declaration=~s/module\s+${module_id}\s*\(/module locked_${module_id}(/;
                 
    		
                 my $temp_count= $key_size-1;
-                my $up_counter=64;
+                my $up_counter=$original_key;
                 while ( $up_counter <= $temp_count ) {
                     $module_declaration .=
                       "input KEYINPUT" .$up_counter. "\;\n";
@@ -727,12 +730,12 @@ else{
 		$header .="wire RLL_wire_A_".$RLL_track_key."\;\n";
 if ($my_lib == 65){
 
-
-
  $body .="XNOR2_X1M_A9TH RLL_XNOR_".$RLL_track_key." (.A(RLL_wire_A_".$RLL_track_key."), .B(KEYINPUT".$RLL_track_key."), .Y(". $output_name.") )\;\n";
 
 }
 else{
+
+#print "Do I enter here?";
    $body .="  XNOR2_X1 RLL_XNOR_".$RLL_track_key." (.A(RLL_wire_A_".$RLL_track_key."), .B(KEYINPUT".$RLL_track_key."), .ZN(". $output_name.") )\;\n";
      }    
                
@@ -853,13 +856,17 @@ else{
           
           }
            elsif ($type==4)
-          {  $header .="wire RLL_wire_A_".$RLL_track_key."\;\n";
+          {  
+
+$header .="wire RLL_wire_A_".$RLL_track_key."\;\n";
 if ($my_lib == 65){
 
 $body .=" XOR2_X1M_A9TH RLL_XOR_".$RLL_track_key." (.A(RLL_wire_A_".$RLL_track_key."), .B(KEYINPUT".$RLL_track_key."), .Y(". $output_name.") )\;\n";
 
 }else{
-                    $body .="  XOR2_X1 RLL_XOR_".$RLL_track_key." (.A(RLL_wire_A_".$RLL_track_key."), .B(KEYINPUT".$RLL_track_key."), .Z(". $output_name.") )\;\n";
+
+#print "Do I enter here?";
+$body .="  XOR2_X1 RLL_XOR_".$RLL_track_key." (.A(RLL_wire_A_".$RLL_track_key."), .B(KEYINPUT".$RLL_track_key."), .Z(". $output_name.") )\;\n";
       }         
            if ($vary==1)
           {  $type = $a[ rand @a ];
