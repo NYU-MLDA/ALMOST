@@ -14,4 +14,6 @@ Steps to follow:
 
 6) Running netlist_to_subgraph_data_gen.sh is going to create two folders: c1355_resyn and c1355_random in OMLA directory. Copy these two folders under graphDataCkt. Create two copies of c1355_random and rename one as c1355_sa. c1355_sa is the folder which will be regularly updated when adversarial model is trained. Basic attack models trained with static data from c1355_resyn and c1355_random take less time to train.
 
-7) Run train_c1355.sh. Here, three models are trained. resyn2 is default OMLA attack model. random is ML model trained with arbitrary random synthesis recipe. sa is adversarially trained model.
+7) Run train_c1355.sh. Here, three models are trained. resyn2 is default OMLA attack model. random is ML model trained with arbitrary random synthesis recipe. sa is adversarially trained model. The models will be saved in dumpDataCkt.
+
+8) Now, go to ALMOST/src and run c1355_generate_recipe.sh. This will use three pre-trained ML attacks models as evaluator in simulated annealing. After running SA for certain iterations (currently set at 110), this will generate the best recipe targeted to minimize accuracy to 50%.. The synthesized netlist will be in ALMOST/dump folder.
