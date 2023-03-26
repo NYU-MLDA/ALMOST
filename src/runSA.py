@@ -68,6 +68,8 @@ def main():
     print(ret.fun)
     recipe=getRecipe(ret.x)
     print(recipe)
+    # Generate best synthesized netlist (ALMOST synthesized in case of using adversarial model)
+    synthesize(ret.x)
     print("\nTime elapsed: "+str(timeElapsed)+"s")
     
 if __name__ == "__main__":
