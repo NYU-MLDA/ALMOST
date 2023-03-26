@@ -1,0 +1,7 @@
+Epoch: 1, trn_loss: 3.099750, trn_acc: 0.508098, val_loss: 3.645171, val_acc: 0.515607
+Epoch: 1, trn_loss: 2.723617, trn_acc: 0.509141, val_loss: 2.310578, val_acc: 0.516266
+Epoch: 1, trn_loss: 2.723617, trn_acc: 0.509141, val_loss: 2.310578, val_acc: 0.516266
+Best epoch: 1 trn_loss: 2.723617, trn_acc: 0.509141, test_acc: 0.432432
+TP: 26 FP: 23 TN: 22 FN: 40
+Epoch: 2, trn_loss: 2.162085, trn_acc: 0.506761, val_loss: 1.190898, val_acc: 0.511564
+Best test for epoch 1 Accuracy: 0.432432 Precision: 53.061224

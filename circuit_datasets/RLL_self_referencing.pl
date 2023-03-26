@@ -20,8 +20,8 @@ my $body="";
 
 my $RLL_key_status =$x[rand @x];
 #my $RLL_key_status =1;
-my $RLL_track_key=128; #we start from 64
-my $original_key=128; #we start from 64
+my $RLL_track_key=64; #we start from 64
+my $original_key=64; #we start from 64
 my %RLL_key_map=();
 my $header="";
 my $key_size=0;
