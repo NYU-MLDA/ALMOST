@@ -1,4 +1,4 @@
-# ALMOST: Adversarial Learning to Mitigate Oracle-less ML Attacks via Synthesis Tuning
+# ALMOST: Adversarial Learning to Mitigate Oracle-less ML Logic Locking attacks via Synthesis Tuning
 ## Contact Info
 This repository contains implementation of the experiments in the following paper:
 
